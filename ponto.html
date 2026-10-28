@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle de Ponto</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#6a7380;--bd:#e1e5ea;--ac:#1f6feb;--ok:#1a8a4a;--bad:#c93c37;--in:#e8f5ee;--out:#fdeceb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171b;--card:#1d2127;--tx:#e8ebef;--mut:#99a2ad;--bd:#2d333b;--ac:#4c8dff;--ok:#43c37b;--bad:#ff7a73;--in:#17301f;--out:#3a1f1e}}
+:root[data-theme="dark"]{--bg:#14171b;--card:#1d2127;--tx:#e8ebef;--mut:#99a2ad;--bd:#2d333b;--ac:#4c8dff;--ok:#43c37b;--bad:#ff7a73;--in:#17301f;--out:#3a1f1e}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 12px}h2{font-size:15px;margin:0 0 10px}
+.clock{font-size:44px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.sub{text-align:center;color:var(--mut);margin-bottom:12px}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:8px 12px;cursor:pointer}
+button.big{width:100%;padding:16px;font-size:18px;font-weight:600;color:#fff;border:0}
+button.big.in{background:var(--ok)}button.big.out{background:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{justify-content:space-between}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.sum div{background:var(--bg);border-radius:10px;padding:10px 4px}
+.sum b{display:block;font-size:20px}.sum span{color:var(--mut);font-size:12px}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:480px}
+th,td{padding:7px 6px;text-align:left;border-bottom:1px solid var(--bd);font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-weight:500;font-size:12px}
+tr.we td{color:var(--mut)}tr.sel td{background:var(--bg)}tr.d{cursor:pointer}
+.pos{color:var(--ok);font-weight:600}.neg{color:var(--bad);font-weight:600}
+input[type=time],input[type=number],textarea{font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:6px}
+input[type=number]{width:70px}textarea{width:100%;min-height:70px;font-size:12px}
+.msg{color:var(--mut);font-size:13px;margin-top:6px;min-height:18px}
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="sub" id="today"></div>
+    <button class="big in" id="punch">Bater ponto</button>
+    <div class="msg" id="status" style="text-align:center"></div>
+  </div>
+
+  <div class="card">
+    <div class="row sp" style="margin-bottom:10px">
+      <button id="prev">←</button>
+      <h1 id="mname" style="margin:0"></h1>
+      <button id="next">→</button>
+    </div>
+    <div class="sum">
+      <div><b id="sWorked">0h00</b><span>Trabalhado</span></div>
+      <div><b id="sExp">0h00</b><span>Previsto (dias com ponto)</span></div>
+      <div><b id="sBal">0h00</b><span>Saldo / horas extras</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Dias do mês <span style="color:var(--mut);font-weight:400">(toque para editar)</span></h2>
+    <div class="wrap"><table>
+      <thead><tr><th>Dia</th><th>Marcações</th><th>Trabalhado</th><th>Saldo</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </div>
+
+  <div class="card" id="edit" hidden>
+    <h2 id="etitle"></h2>
+    <div id="elist"></div>
+    <div class="row" style="margin-top:8px"><button id="eadd">+ Adicionar marcação</button><button id="eclose">Fechar</button></div>
+    <div class="msg">As marcações alternam entre entrada e saída, na ordem do horário.</div>
+  </div>
+
+  <div class="card">
+    <h2>Configurações</h2>
+    <div class="row">
+      <label>Jornada diária (horas) <input type="number" id="daily" min="0" max="24" step="0.25"></label>
+    </div>
+    <label class="row" style="margin-top:8px"><input type="checkbox" id="auto"> Registrar ponto automaticamente ao abrir a página</label>
+    <div class="msg">Dias úteis (seg a sex) usam a jornada acima. Sábado e domingo têm jornada zero, então tudo vira hora extra. Dias sem marcação não entram no cálculo.</div>
+    <h2 style="margin-top:14px">Exportar e backup</h2>
+    <div class="row">
+      <button id="csv">Copiar planilha (CSV)</button>
+      <button id="bkp">Copiar backup</button>
+      <button id="rst">Restaurar backup</button>
+    </div>
+    <textarea id="box" placeholder="Para restaurar, cole o backup aqui e toque em Restaurar backup."></textarea>
+    <div class="msg" id="msg"></div>
+  </div>
+</main>
+
+<script>
+(function(){
+var KEY="ponto:v1";
+var S={daily:8,auto:false,p:{}};
+try{var raw=localStorage.getItem(KEY);if(raw){var o=JSON.parse(raw);if(o&&o.p)S=o}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+var $=function(i){return document.getElementById(i)};
+var pad=function(n){return String(n).padStart(2,"0")};
+var dk=function(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+var hm=function(d){return pad(d.getHours())+":"+pad(d.getMinutes())};
+var toMin=function(s){var a=s.split(":");return +a[0]*60+ +a[1]};
+var DOW=["dom","seg","ter","qua","qui","sex","sáb"];
+var MES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+function fmt(m,sign){var s=m<0?"-":(sign&&m>0?"+":"");m=Math.abs(Math.round(m));return s+Math.floor(m/60)+"h"+pad(m%60)}
+function list(k){return (S.p[k]||[]).slice().sort()}
+function worked(k,now){var l=list(k),t=0;for(var i=0;i<l.length;i+=2){var a=toMin(l[i]);var b=i+1<l.length?toMin(l[i+1]):(k===dk(new Date())?now:a);t+=Math.max(0,b-a)}return t}
+function expected(date){var w=date.getDay();return(w===0||w===6)?0:S.daily*60}
+
+var now=new Date(),view={y:now.getFullYear(),m:now.getMonth()},sel=null;
+
+function punch(){
+  var d=new Date(),k=dk(d),t=hm(d);
+  S.p[k]=S.p[k]||[];
+  if(S.p[k].indexOf(t)>-1){return}
+  S.p[k].push(t);S.p[k].sort();save();render();
+}
+function tick(){
+  var d=new Date();
+  $("clock").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  $("today").textContent=DOW[d.getDay()]+", "+d.getDate()+" de "+MES[d.getMonth()].toLowerCase()+" de "+d.getFullYear();
+  var l=list(dk(d)),open=l.length%2===1,b=$("punch");
+  b.textContent=open?"Bater saída":"Bater entrada";
+  b.className="big "+(open?"out":"in");
+  $("status").textContent=open?("Trabalhando desde "+l[l.length-1]+" · hoje: "+fmt(worked(dk(d),d.getHours()*60+d.getMinutes()))):(l.length?("Fora · hoje: "+fmt(worked(dk(d),0))):"Nenhuma marcação hoje");
+}
+function render(){
+  tick();
+  var y=view.y,m=view.m,n=new Date(y,m+1,0).getDate(),nowD=new Date(),nm=nowD.getHours()*60+nowD.getMinutes();
+  $("mname").textContent=MES[m]+" "+y;
+  var tw=0,te=0,h="";
+  for(var i=1;i<=n;i++){
+    var d=new Date(y,m,i),k=dk(d),l=list(k),w=d.getDay(),we=(w===0||w===6);
+    var wk=worked(k,nm),has=l.length>0,ex=expected(d),bal=wk-ex;
+    if(has){tw+=wk;te+=ex}
+    h+='<tr class="d'+(we?" we":"")+(sel===k?" sel":"")+'" data-k="'+k+'"><td>'+pad(i)+" "+DOW[w]+"</td><td>"+(l.join(" · ")||"—")+"</td><td>"+(has?fmt(wk):"—")+'</td><td class="'+(has?(bal>0?"pos":bal<0?"neg":""):"")+'">'+(has?fmt(bal,true):"—")+"</td></tr>";
+  }
+  $("rows").innerHTML=h;
+  $("sWorked").textContent=fmt(tw);$("sExp").textContent=fmt(te);
+  var b=tw-te,e=$("sBal");e.textContent=fmt(b,true);e.className=b>0?"pos":b<0?"neg":"";
+  $("daily").value=S.daily;$("auto").checked=!!S.auto;
+  renderEdit();
+}
+function renderEdit(){
+  var box=$("edit");
+  if(!sel){box.hidden=true;return}
+  box.hidden=false;
+  var p=sel.split("-");$("etitle").textContent="Editar "+p[2]+"/"+p[1]+"/"+p[0];
+  var l=list(sel),h="";
+  l.forEach(function(t,i){
+    h+='<div class="row" style="margin-bottom:6px"><span style="width:60px;color:var(--mut)">'+(i%2?"Saída":"Entrada")+'</span><input type="time" value="'+t+'" data-i="'+i+'"><button data-del="'+i+'">Excluir</button></div>';
+  });
+  $("elist").innerHTML=h||'<div class="msg">Sem marcações neste dia.</div>';
+}
+$("punch").onclick=punch;
+$("prev").onclick=function(){view.m--;if(view.m<0){view.m=11;view.y--}sel=null;render()};
+$("next").onclick=function(){view.m++;if(view.m>11){view.m=0;view.y++}sel=null;render()};
+$("rows").onclick=function(ev){var tr=ev.target.closest("tr");if(!tr)return;sel=tr.getAttribute("data-k");render();$("edit").scrollIntoView({behavior:"smooth",block:"nearest"})};
+$("eclose").onclick=function(){sel=null;render()};
+$("eadd").onclick=function(){S.p[sel]=S.p[sel]||[];var t="09:00",l=list(sel);if(l.length)t=l[l.length-1];S.p[sel]=l.concat([t]);save();render()};
+$("elist").onclick=function(ev){var i=ev.target.getAttribute("data-del");if(i===null)return;var l=list(sel);l.splice(+i,1);S.p[sel]=l;if(!l.length)delete S.p[sel];save();render()};
+$("elist").onchange=function(ev){var i=ev.target.getAttribute("data-i");if(i===null||!ev.target.value)return;var l=list(sel);l[+i]=ev.target.value;S.p[sel]=l.sort();save();render()};
+$("daily").onchange=function(){var v=parseFloat($("daily").value);if(isNaN(v)||v<0)v=8;S.daily=v;save();render()};
+$("auto").onchange=function(){S.auto=$("auto").checked;save()};
+
+function say(t){$("msg").textContent=t}
+function copy(txt,ok){
+  $("box").value=txt;
+  try{navigator.clipboard.writeText(txt).then(function(){say(ok)},function(){$("box").select();say("Selecionei o texto abaixo: copie manualmente.")})}
+  catch(e){$("box").select();say("Selecionei o texto abaixo: copie manualmente.")}
+}
+$("csv").onclick=function(){
+  var y=view.y,m=view.m,n=new Date(y,m+1,0).getDate(),nm=0,rows=["Data;Dia;Marcações;Trabalhado (h);Previsto (h);Saldo (h)"];
+  for(var i=1;i<=n;i++){
+    var d=new Date(y,m,i),k=dk(d),l=list(k);if(!l.length)continue;
+    var wk=worked(k,nm),ex=expected(d),f=function(x){return (x/60).toFixed(2).replace(".",",")};
+    rows.push(pad(i)+"/"+pad(m+1)+"/"+y+";"+DOW[d.getDay()]+";"+l.join(" ")+";"+f(wk)+";"+f(ex)+";"+f(wk-ex));
+  }
+  copy(rows.join("\n"),"Planilha copiada. Cole no Excel ou Google Planilhas.");
+};
+$("bkp").onclick=function(){copy(JSON.stringify(S),"Backup copiado. Guarde em um lugar seguro.")};
+$("rst").onclick=function(){
+  try{var o=JSON.parse($("box").value);if(!o||typeof o.p!=="object")throw 0;S=o;if(typeof S.daily!=="number")S.daily=8;save();render();say("Backup restaurado.")}
+  catch(e){say("Backup inválido. Cole o texto completo no campo acima.")}
+};
+
+if(S.auto){
+  var d=new Date(),l=list(dk(d)),last=l.length?l[l.length-1]:null;
+  if(!last||Math.abs(toMin(hm(d))-toMin(last))>=1)punch();
+}
+render();
+setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>
